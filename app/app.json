@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Meshtastic Heatmap",
+    "slug": "meshtastic-heatmap",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f1117"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cyclemond.meshtastic-heatmap",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Bluetooth is used to connect to your Meshtastic node to collect signal data.",
+        "NSBluetoothPeripheralUsageDescription": "Bluetooth is used to connect to your Meshtastic node to collect signal data.",
+        "NSLocationWhenInUseUsageDescription": "Location is used to map signal coverage while you move.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location is used to map signal coverage while you move.",
+        "UIBackgroundModes": ["bluetooth-central", "location"]
+      }
+    },
+    "android": {
+      "package": "com.cyclemond.meshtasticheatmap",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1117",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Location is used to map signal coverage while you move."
+        }
+      ]
+    ]
+  }
+}
