@@ -125,7 +125,7 @@ export default function MapScreen() {
       {/* Search bar — floats above the map */}
       <View style={styles.searchContainer}>
         <GooglePlacesAutocomplete
-          placeholder="Search address or place…"
+          placeholder="Search address..."
           fetchDetails
           onPress={handlePlaceSelected}
           query={{ key: MAPS_API_KEY, language: 'en' }}
