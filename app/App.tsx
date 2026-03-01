@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MapScreen from './src/screens/MapScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import LogoHeader from './src/components/LogoHeader';
 import { useBleStore } from './src/stores/bleStore';
 
 const Tab = createBottomTabNavigator();
@@ -44,7 +45,8 @@ export default function App() {
           name="Map"
           component={MapScreen}
           options={{
-            title: 'Heatmap',
+            headerTitle: () => <LogoHeader />,
+            tabBarLabel: 'Heatmap',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="map" size={size} color={color} />
             ),
@@ -54,7 +56,8 @@ export default function App() {
           name="Scan"
           component={ScanScreen}
           options={{
-            title: 'Node',
+            headerTitle: () => <LogoHeader />,
+            tabBarLabel: 'Node',
             tabBarIcon: ({ color, size }) => (
               <Ionicons
                 name={isConnected ? 'radio' : 'radio-outline'}
@@ -68,7 +71,8 @@ export default function App() {
           name="Settings"
           component={SettingsScreen}
           options={{
-            title: 'Settings',
+            headerTitle: () => <LogoHeader />,
+            tabBarLabel: 'Settings',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="settings-outline" size={size} color={color} />
             ),
