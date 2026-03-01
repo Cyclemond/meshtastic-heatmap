@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useBleStore } from '../stores/bleStore';
 import { bleService } from '../services/meshtastic/ble';
 import { ConnectedDevice } from '../types';
@@ -95,7 +96,7 @@ export default function ScanScreen() {
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.deviceRow} onPress={() => handleConnect(item)}>
                 <View style={styles.deviceIcon}>
-                  <Text style={styles.deviceIconText}>📡</Text>
+                  <Ionicons name="radio" size={22} color="#60a5fa" />
                 </View>
                 <View style={styles.deviceInfo}>
                   <Text style={styles.deviceName}>{item.name ?? 'Unknown Device'}</Text>
@@ -110,7 +111,7 @@ export default function ScanScreen() {
 
       {!isScanning && discoveredDevices.length === 0 && !isConnected && (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔍</Text>
+          <Ionicons name="search" size={48} color="#374151" style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>No nodes found yet</Text>
           <Text style={styles.emptySubtitle}>
             Make sure your Meshtastic device is powered on and within Bluetooth range,
