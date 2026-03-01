@@ -2,7 +2,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import MapScreen from './src/screens/MapScreen';
 import ScanScreen from './src/screens/ScanScreen';
@@ -45,7 +45,9 @@ export default function App() {
           component={MapScreen}
           options={{
             title: 'Heatmap',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🗺️</Text>,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="map" size={size} color={color} />
+            ),
           }}
         />
         <Tab.Screen
@@ -53,12 +55,13 @@ export default function App() {
           component={ScanScreen}
           options={{
             title: 'Node',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 20 }}>
-                {isConnected ? '📡' : '🔍'}
-              </Text>
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons
+                name={isConnected ? 'radio' : 'radio-outline'}
+                size={size}
+                color={color}
+              />
             ),
-            tabBarBadge: isConnected ? undefined : undefined,
           }}
         />
         <Tab.Screen
@@ -66,7 +69,9 @@ export default function App() {
           component={SettingsScreen}
           options={{
             title: 'Settings',
-            tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text>,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="settings-outline" size={size} color={color} />
+            ),
           }}
         />
       </Tab.Navigator>
