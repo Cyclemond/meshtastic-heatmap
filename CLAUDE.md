@@ -85,8 +85,12 @@ npx expo run:ios       # (requires Xcode — not yet set up)
 Two AVDs available: `Pixel_8` (preferred) and `Medium_Phone_API_36.1`
 ```bash
 # Start emulator manually if needed
-~/Library/Android/sdk/emulator/emulator -avd Pixel_8 -no-snapshot-load &
+~/Library/Android/sdk/emulator/emulator -avd Pixel_8 -no-snapshot-load &disown
 ```
+
+**Emulator gestures (Mac):**
+- Pinch to zoom: hold **Cmd** and drag (not Ctrl)
+- The +/− zoom buttons on the map are easier for zooming in the emulator
 
 ---
 
