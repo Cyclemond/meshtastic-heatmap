@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as SplashScreen from 'expo-splash-screen';
 
 import MapScreen from './src/screens/MapScreen';
 import ScanScreen from './src/screens/ScanScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import LogoHeader from './src/components/LogoHeader';
 import { useBleStore } from './src/stores/bleStore';
+
+// Keep the splash screen visible until we explicitly hide it
+SplashScreen.preventAutoHideAsync();
 
 const Tab = createBottomTabNavigator();
 
@@ -27,6 +31,11 @@ const darkTheme = {
 export default function App() {
   const connectionState = useBleStore((s) => s.connectionState);
   const isConnected = connectionState === 'connected';
+
+  useEffect(() => {
+    // Hide the splash screen once the app has rendered
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
     <NavigationContainer theme={darkTheme}>
