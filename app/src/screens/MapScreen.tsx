@@ -138,6 +138,7 @@ export default function MapScreen() {
             description: styles.searchRowText,
             poweredContainer: { display: 'none' },
           }}
+          textInputProps={{ placeholderTextColor: '#ffffff' }}
           enablePoweredByContainer={false}
           keepResultsAfterBlur={false}
           keyboardShouldPersistTaps="handled"
