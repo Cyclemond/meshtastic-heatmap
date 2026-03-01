@@ -82,6 +82,12 @@ export default function MapScreen() {
         showsMyLocationButton
         mapType="standard"
         customMapStyle={darkMapStyle}
+        zoomEnabled
+        scrollEnabled
+        pitchEnabled
+        rotateEnabled
+        zoomControlEnabled
+        zoomTapEnabled={false}
       >
         {heatmapPoints.length > 0 && Platform.OS !== 'web' && (
           <Heatmap
