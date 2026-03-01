@@ -49,8 +49,6 @@ export default {
       adaptiveIcon: {
         backgroundColor: '#0f1117',
         foregroundImage: './assets/android-icon-foreground.png',
-        backgroundImage: './assets/android-icon-background.png',
-        monochromeImage: './assets/android-icon-monochrome.png',
       },
       predictiveBackGestureEnabled: false,
       config: {
@@ -84,6 +82,14 @@ export default {
     // ── Plugins ────────────────────────────────────────────────────────────────
     plugins: [
       'expo-dev-client',
+      [
+        'expo-splash-screen',
+        {
+          backgroundColor: '#0f1117',
+          image: './assets/splash-icon.png',
+          imageWidth: 400,
+        },
+      ],
       [
         'expo-location',
         {
