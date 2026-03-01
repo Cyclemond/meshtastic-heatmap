@@ -4,7 +4,7 @@
  * Handles scanning for and connecting to a Meshtastic node via Bluetooth Low Energy.
  *
  * Meshtastic BLE interface:
- *   Service UUID:       6ba4xxxx-1b01-... (varies by firmware version)
+ *   Service UUID:       6ba40001-1b01-3572-8d87-f8e38b0ffc14
  *   We scan by service UUID or by device name containing "Meshtastic" / "T-Beam" / "T-Lora" etc.
  *
  * NOTE: BLE requires a custom dev build (Expo Go does not support native BLE).
@@ -12,6 +12,7 @@
  */
 
 import { BleManager, Device, State } from 'react-native-ble-plx';
+import * as protobuf from 'protobufjs';
 import { useBleStore } from '../../stores/bleStore';
 import { useReadingsStore } from '../../stores/readingsStore';
 import { useLocationStore } from '../../stores/locationStore';
@@ -20,10 +21,35 @@ import { SignalReading } from '../../types';
 // ─── Meshtastic BLE UUIDs ─────────────────────────────────────────────────────
 // These are the service and characteristic UUIDs for the Meshtastic BLE interface.
 // See: https://github.com/meshtastic/firmware/blob/master/src/nimble/NimbleBluetooth.cpp
-const MESHTASTIC_SERVICE_UUID = '6ba4xxxx-1b01-3572-8d87-f8e38b0ffc14';
+const MESHTASTIC_SERVICE_UUID = '6ba40001-1b01-3572-8d87-f8e38b0ffc14';
 const FROMRADIO_CHAR_UUID = '2c55e69e-4993-11ed-b878-0242ac120002'; // Node → App (received packets)
 const TORADIO_CHAR_UUID = 'f75c76d2-129e-4dad-a1dd-7866124401e7';   // App → Node (send packets)
 const FROMNUM_CHAR_UUID = 'ed9da18c-a800-4f66-a670-aa7547b377f7';   // Notification: new packet waiting
+
+// ─── Protobuf schema ──────────────────────────────────────────────────────────
+// Minimal inline schema for the two Meshtastic message types we care about.
+// Field numbers from https://github.com/meshtastic/protobufs/blob/master/meshtastic/mesh.proto
+const protoRoot = protobuf.Root.fromJSON({
+  nested: {
+    meshtastic: {
+      nested: {
+        MeshPacket: {
+          fields: {
+            from:   { id: 1,  type: 'uint32', rule: 'optional' },
+            rxSnr:  { id: 9,  type: 'float',  rule: 'optional' },
+            rxRssi: { id: 13, type: 'int32',  rule: 'optional' },
+          },
+        },
+        FromRadio: {
+          fields: {
+            packet: { id: 2, type: 'meshtastic.MeshPacket', rule: 'optional' },
+          },
+        },
+      },
+    },
+  },
+});
+const FromRadioType = protoRoot.lookupType('meshtastic.FromRadio');
 
 // Device name fragments used to identify Meshtastic nodes during scanning
 const MESHTASTIC_DEVICE_NAMES = [
@@ -147,7 +173,7 @@ const startListening = (device: Device): void => {
         // The value is a base64-encoded protobuf (FromRadio message).
         // For Phase 1 we extract RSSI/SNR from the raw bytes.
         // Full protobuf parsing will be added in Phase 2.
-        const packet = parseFromRadioBasic(radioChar.value);
+        const packet = parseFromRadio(radioChar.value);
         if (!packet) return;
 
         const { currentLocation } = useLocationStore.getState();
@@ -194,28 +220,26 @@ const generateId = (): string =>
   Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 /**
- * Basic parser for a FromRadio protobuf packet encoded as base64.
- * Extracts RSSI, SNR, and the sender node ID.
- *
- * TODO: Replace with a full protobuf parser (meshtastic-js or protobufjs) in Phase 2.
- * For now, this reads known byte offsets from the MeshPacket structure.
+ * Decodes a base64-encoded Meshtastic FromRadio protobuf packet.
+ * Extracts the sender node ID, RSSI, and SNR from the inner MeshPacket.
  */
-const parseFromRadioBasic = (
+const parseFromRadio = (
   base64Value: string
 ): { fromNodeId: string; rssi: number; snr: number } | null => {
   try {
     const bytes = Buffer.from(base64Value, 'base64');
-    // MeshPacket fields (proto3 wire format):
-    //   field 1 (from): varint — sender node ID
-    //   field 9 (rx_rssi): int32
-    //   field 10 (rx_snr): float
-    // A proper protobuf parser is needed for production — this is a placeholder.
-    if (bytes.length < 4) return null;
+    if (bytes.length < 2) return null;
 
-    // Placeholder values — will be replaced by real protobuf parsing
-    const rssi = -80; // placeholder
-    const snr = 5;    // placeholder
-    const fromNodeId = '!unknown';
+    const message = FromRadioType.decode(bytes) as any;
+    const pkt = message.packet;
+    if (!pkt) return null;
+
+    const rssi: number = pkt.rxRssi ?? -999;
+    const snr: number = pkt.rxSnr ?? 0;
+    // Meshtastic node IDs are 32-bit unsigned ints, conventionally displayed as !hex
+    const fromNodeId: string = pkt.from
+      ? `!${(pkt.from >>> 0).toString(16).padStart(8, '0')}`
+      : '!unknown';
 
     return { fromNodeId, rssi, snr };
   } catch {
