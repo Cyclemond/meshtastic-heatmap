@@ -12,7 +12,7 @@
  */
 
 import { BleManager, Device, State } from 'react-native-ble-plx';
-import * as protobuf from 'protobufjs';
+import { Buffer } from 'buffer';
 import { useBleStore } from '../../stores/bleStore';
 import { useReadingsStore } from '../../stores/readingsStore';
 import { useLocationStore } from '../../stores/locationStore';
@@ -26,30 +26,42 @@ const FROMRADIO_CHAR_UUID = '2c55e69e-4993-11ed-b878-0242ac120002'; // Node → 
 const TORADIO_CHAR_UUID = 'f75c76d2-129e-4dad-a1dd-7866124401e7';   // App → Node (send packets)
 const FROMNUM_CHAR_UUID = 'ed9da18c-a800-4f66-a670-aa7547b377f7';   // Notification: new packet waiting
 
-// ─── Protobuf schema ──────────────────────────────────────────────────────────
-// Minimal inline schema for the two Meshtastic message types we care about.
-// Field numbers from https://github.com/meshtastic/protobufs/blob/master/meshtastic/mesh.proto
-const protoRoot = protobuf.Root.fromJSON({
-  nested: {
-    meshtastic: {
-      nested: {
-        MeshPacket: {
-          fields: {
-            from:   { id: 1,  type: 'uint32', rule: 'optional' },
-            rxSnr:  { id: 9,  type: 'float',  rule: 'optional' },
-            rxRssi: { id: 13, type: 'int32',  rule: 'optional' },
-          },
-        },
-        FromRadio: {
-          fields: {
-            packet: { id: 2, type: 'meshtastic.MeshPacket', rule: 'optional' },
-          },
-        },
-      },
-    },
-  },
-});
-const FromRadioType = protoRoot.lookupType('meshtastic.FromRadio');
+// ─── Minimal protobuf binary decoder ─────────────────────────────────────────
+// Avoids third-party proto libraries that have Hermes/production-build issues.
+// Decodes only the fields we care about from FromRadio and MeshPacket.
+//
+// Wire format reference: https://protobuf.dev/programming-guides/encoding/
+//   Wire type 0 = varint   (uint32, int32)
+//   Wire type 1 = 64-bit   (double — skipped)
+//   Wire type 2 = LEN      (bytes / nested message)
+//   Wire type 5 = 32-bit   (float)
+
+/** Read a base-128 varint from buf at offset. Returns [value, newOffset]. */
+function readVarint(buf: Uint8Array, pos: number): [number, number] {
+  let lo = 0;
+  let shift = 0;
+  while (pos < buf.length) {
+    const byte = buf[pos++];
+    lo |= (byte & 0x7f) << shift; // JS bitwise ops are 32-bit — this is intentional
+    shift += 7;
+    if ((byte & 0x80) === 0) break;
+    if (shift >= 35) {
+      // Consume remaining bytes of a 10-byte (64-bit) varint without accumulating
+      while (pos < buf.length && buf[pos++] & 0x80);
+      break;
+    }
+  }
+  return [lo, pos];
+}
+
+/** Skip one field value given its wire type. Returns new offset. */
+function skipField(buf: Uint8Array, pos: number, wireType: number): number {
+  if (wireType === 0) { const [, p] = readVarint(buf, pos); return p; }
+  if (wireType === 1) { return pos + 8; }
+  if (wireType === 2) { const [len, p] = readVarint(buf, pos); return p + len; }
+  if (wireType === 5) { return pos + 4; }
+  return buf.length; // unknown — stop parsing
+}
 
 // Device name fragments used to identify Meshtastic nodes during scanning
 const MESHTASTIC_DEVICE_NAMES = [
@@ -222,26 +234,60 @@ const generateId = (): string =>
 /**
  * Decodes a base64-encoded Meshtastic FromRadio protobuf packet.
  * Extracts the sender node ID, RSSI, and SNR from the inner MeshPacket.
+ *
+ * FromRadio fields used:  packet (field 2, LEN) → MeshPacket
+ * MeshPacket fields used: from (field 1, varint), rx_snr (field 9, float32), rx_rssi (field 13, int32)
  */
 const parseFromRadio = (
   base64Value: string
 ): { fromNodeId: string; rssi: number; snr: number } | null => {
   try {
-    const bytes = Buffer.from(base64Value, 'base64');
+    const bytes: Uint8Array = Buffer.from(base64Value, 'base64');
     if (bytes.length < 2) return null;
 
-    const message = FromRadioType.decode(bytes) as any;
-    const pkt = message.packet;
-    if (!pkt) return null;
+    // ── Step 1: find MeshPacket (field 2) inside FromRadio ──────────────────
+    let meshBytes: Uint8Array | null = null;
+    let i = 0;
+    while (i < bytes.length) {
+      const [tag, i1] = readVarint(bytes, i); i = i1;
+      const fieldNum = tag >>> 3;
+      const wireType = tag & 0x7;
+      if (wireType === 2) {
+        const [len, i2] = readVarint(bytes, i); i = i2;
+        if (fieldNum === 2) meshBytes = bytes.subarray(i, i + len);
+        i += len;
+      } else {
+        i = skipField(bytes, i, wireType);
+      }
+    }
+    if (!meshBytes || meshBytes.length === 0) return null;
 
-    const rssi: number = pkt.rxRssi ?? -999;
-    const snr: number = pkt.rxSnr ?? 0;
-    // Meshtastic node IDs are 32-bit unsigned ints, conventionally displayed as !hex
-    const fromNodeId: string = pkt.from
-      ? `!${(pkt.from >>> 0).toString(16).padStart(8, '0')}`
-      : '!unknown';
+    // ── Step 2: extract from (1), rx_snr (9), rx_rssi (13) from MeshPacket ─
+    let fromNode = 0;
+    let rxRssi  = -999;
+    let rxSnr   = 0;
+    i = 0;
+    while (i < meshBytes.length) {
+      const [tag, i1] = readVarint(meshBytes, i); i = i1;
+      const fieldNum = tag >>> 3;
+      const wireType = tag & 0x7;
+      if (wireType === 0) {
+        const [val, i2] = readVarint(meshBytes, i); i = i2;
+        if (fieldNum === 1)  fromNode = val >>> 0;  // uint32 node ID
+        if (fieldNum === 13) rxRssi   = val | 0;    // int32 — sign-extend
+      } else if (wireType === 5 && fieldNum === 9) {
+        // float32 little-endian
+        const view = new DataView(meshBytes.buffer, meshBytes.byteOffset + i, 4);
+        rxSnr = view.getFloat32(0, true);
+        i += 4;
+      } else {
+        i = skipField(meshBytes, i, wireType);
+      }
+    }
 
-    return { fromNodeId, rssi, snr };
+    if (fromNode === 0) return null;
+    const fromNodeId = `!${fromNode.toString(16).padStart(8, '0')}`;
+    return { fromNodeId, rssi: rxRssi, snr: rxSnr };
   } catch {
     return null;
   }
