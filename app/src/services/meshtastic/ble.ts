@@ -12,6 +12,7 @@
  */
 
 import { BleManager, Device, State } from 'react-native-ble-plx';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { useBleStore } from '../../stores/bleStore';
 import { useReadingsStore } from '../../stores/readingsStore';
 import { useLocationStore } from '../../stores/locationStore';
@@ -89,11 +90,44 @@ const isMeshtasticDevice = (device: Device): boolean => {
   );
 };
 
+// ─── Permissions ──────────────────────────────────────────────────────────────
+
+const requestBluetoothPermissions = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') return true;
+
+  if (Platform.Version < 31) {
+    // Android < 12: Bluetooth scanning requires Location permission
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+    );
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  }
+
+  // Android 12+ (API 31+): requires BLUETOOTH_SCAN + BLUETOOTH_CONNECT + Location
+  const results = await PermissionsAndroid.requestMultiple([
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  ]);
+
+  return (
+    results['android.permission.BLUETOOTH_SCAN']   === PermissionsAndroid.RESULTS.GRANTED &&
+    results['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED &&
+    results['android.permission.ACCESS_FINE_LOCATION'] === PermissionsAndroid.RESULTS.GRANTED
+  );
+};
+
 // ─── Scan ─────────────────────────────────────────────────────────────────────
 
 export const startScan = async (): Promise<void> => {
   const { setConnectionState, addDiscoveredDevice, clearDiscoveredDevices, setError } =
     useBleStore.getState();
+
+  const hasPermissions = await requestBluetoothPermissions();
+  if (!hasPermissions) {
+    setError('Bluetooth permissions are required to scan for nodes. Please grant them in Settings.');
+    return;
+  }
 
   const manager = getManager();
 
