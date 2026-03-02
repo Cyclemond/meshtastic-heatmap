@@ -13,6 +13,7 @@ export default {
   expo: {
     name: 'Meshtastic Heatmap',
     slug: 'meshtastic-heatmap',
+    owner: 'cycelmond',
     version: '0.1.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -77,6 +78,9 @@ export default {
     // ── Extra (accessible inside the app via Constants.expoConfig.extra) ───────
     extra: {
       googleMapsApiKey,
+      eas: {
+        projectId: '5cef8864-6c74-444a-a179-fce40638ff74',
+      },
     },
 
     // ── Plugins ────────────────────────────────────────────────────────────────
