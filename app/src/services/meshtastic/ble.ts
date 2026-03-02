@@ -12,7 +12,6 @@
  */
 
 import { BleManager, Device, State } from 'react-native-ble-plx';
-import { Buffer } from 'buffer';
 import { useBleStore } from '../../stores/bleStore';
 import { useReadingsStore } from '../../stores/readingsStore';
 import { useLocationStore } from '../../stores/locationStore';
@@ -242,7 +241,7 @@ const parseFromRadio = (
   base64Value: string
 ): { fromNodeId: string; rssi: number; snr: number } | null => {
   try {
-    const bytes: Uint8Array = Buffer.from(base64Value, 'base64');
+    const bytes = Buffer.from(base64Value, 'base64') as unknown as Uint8Array;
     if (bytes.length < 2) return null;
 
     // ── Step 1: find MeshPacket (field 2) inside FromRadio ──────────────────
