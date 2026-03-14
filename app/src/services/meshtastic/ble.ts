@@ -197,8 +197,8 @@ export const connectToDevice = async (deviceId: string): Promise<void> => {
 
     // Send want_config handshake — tells the node to start pushing packets to us.
     // Without this the node stays silent after a BLE connection.
-    // ToRadio { want_config_id: 1 } encodes to two bytes: field 3 varint 1 = [0x18, 0x01]
-    const wantConfig = Buffer.from([0x18, 0x01]).toString('base64');
+    // ToRadio { want_config_id: 1 } = bytes [0x18, 0x01] = base64 "GAE="
+    const wantConfig = 'GAE=';
     await device.writeCharacteristicWithResponseForService(
       MESHTASTIC_SERVICE_UUID,
       TORADIO_CHAR_UUID,
