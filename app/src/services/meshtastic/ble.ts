@@ -75,6 +75,7 @@ const MESHTASTIC_DEVICE_NAMES = [
 ];
 
 let bleManager: BleManager | null = null;
+let scanStopTimer: ReturnType<typeof setTimeout> | null = null;
 
 const getManager = (): BleManager => {
   if (!bleManager) {
@@ -84,10 +85,11 @@ const getManager = (): BleManager => {
 };
 
 const isMeshtasticDevice = (device: Device): boolean => {
-  const name = device.name ?? '';
-  return MESHTASTIC_DEVICE_NAMES.some((n) =>
-    name.toLowerCase().includes(n.toLowerCase())
-  );
+  // Check both `name` (OS cache) and `localName` (advertising packet).
+  // On Android, `name` can be null after a firmware flash/reconnect while
+  // `localName` correctly reflects what the device is currently advertising.
+  const name = (device.name ?? device.localName ?? '').toLowerCase();
+  return MESHTASTIC_DEVICE_NAMES.some((n) => name.includes(n.toLowerCase()));
 };
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -140,23 +142,36 @@ export const startScan = async (): Promise<void> => {
   clearDiscoveredDevices();
   setConnectionState('scanning');
 
+  // Scan all devices — filter by Meshtastic service UUID OR by device name.
+  // Scanning all (null) is required because some firmware versions don't include
+  // the service UUID in the advertisement packet, so a UUID-only scan misses them.
   manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
     if (error) {
       setError(error.message);
       return;
     }
-    if (device && isMeshtasticDevice(device)) {
-      addDiscoveredDevice({ id: device.id, name: device.name });
+    if (!device) return;
+
+    const byServiceUUID = device.serviceUUIDs?.includes(MESHTASTIC_SERVICE_UUID) ?? false;
+    const byName = isMeshtasticDevice(device);
+
+    if (byServiceUUID || byName) {
+      addDiscoveredDevice({ id: device.id, name: device.name ?? device.localName });
     }
   });
 
-  // Auto-stop scan after 15 seconds
-  setTimeout(() => {
+  // Auto-stop after 15 seconds — cancel any previous timer first
+  if (scanStopTimer) clearTimeout(scanStopTimer);
+  scanStopTimer = setTimeout(() => {
     stopScan();
   }, 15000);
 };
 
 export const stopScan = (): void => {
+  if (scanStopTimer) {
+    clearTimeout(scanStopTimer);
+    scanStopTimer = null;
+  }
   getManager().stopDeviceScan();
   const { connectionState, setConnectionState } = useBleStore.getState();
   if (connectionState === 'scanning') {
